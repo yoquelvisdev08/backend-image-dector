@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Documentación del Proyecto</title>
+    <style>
+        :root {
+            --primary-color: #4a6fa5;
+            --secondary-color: #166088;
+            --accent-color: #4fc3f7;
+            --text-color: #333;
+            --light-bg: #f5f7fa;
+            --code-bg: #f1f1f1;
+            --border-color: #ddd;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: white;
+        }
+        
+        header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 30px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        h1 {
+            margin: 0;
+            font-size: 2.5em;
+        }
+        
+        .project-description {
+            font-size: 1.2em;
+            margin-top: 10px;
+            opacity: 0.9;
+        }
+        
+        h2 {
+            color: var(--secondary-color);
+            border-bottom: 2px solid var(--accent-color);
+            padding-bottom: 8px;
+            margin-top: 40px;
+        }
+        
+        h3 {
+            color: var(--secondary-color);
+            margin-top: 25px;
+        }
+        
+        p, ul, ol {
+            margin-bottom: 20px;
+        }
+        
+        code {
+            background-color: var(--code-bg);
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-family: 'Courier New', Courier, monospace;
+        }
+        
+        pre {
+            background-color: var(--code-bg);
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            border: 1px solid var(--border-color);
+        }
+        
+        .section {
+            margin-bottom: 40px;
+        }
+        
+        .feature-card {
+            background-color: var(--light-bg);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+        
+        .feature-title {
+            color: var(--secondary-color);
+            margin-top: 0;
+        }
+        
+        .installation-steps {
+            background-color: var(--light-bg);
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid var(--accent-color);
+        }
+        
+        .tech-stack {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        
+        .tech-badge {
+            background-color: var(--secondary-color);
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+        }
+        
+        .file-structure {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: var(--light-bg);
+            padding: 20px;
+            border-radius: 5px;
+            white-space: pre;
+            line-height: 1.4;
+        }
+        
+        footer {
+            margin-top: 50px;
+            text-align: center;
+            color: #666;
+            font-size: 0.9em;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-color);
+        }
+        
+        @media (max-width: 768px) {
+            body {
+                padding: 15px;
+            }
+            
+            header {
+                padding: 20px;
+            }
+            
+            h1 {
+                font-size: 2em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Nombre del Proyecto</h1>
+        <p class="project-description">Una breve descripción del propósito y funcionalidad principal del proyecto.</p>
+    </header>
+    
+    <div class="section">
+        <h2>📋 Descripción General</h2>
+        <p>
+            Aquí puedes proporcionar una descripción más detallada del proyecto, incluyendo su propósito, 
+            los problemas que resuelve y cualquier otra información relevante para entender el contexto.
+        </p>
+    </div>
+    
+    <div class="section">
+        <h2>🚀 Tecnologías Utilizadas</h2>
+        <p>Este proyecto ha sido desarrollado utilizando las siguientes tecnologías:</p>
+        
+        <div class="tech-stack">
+            <span class="tech-badge">HTML5</span>
+            <span class="tech-badge">CSS3</span>
+            <span class="tech-badge">JavaScript</span>
+            <span class="tech-badge">React</span>
+            <!-- Añade o elimina tecnologías según corresponda -->
+        </div>
+    </div>
+    
+    <div class="section">
+        <h2>⚙️ Instalación y Configuración</h2>
+        
+        <div class="installation-steps">
+            <h3>Requisitos Previos</h3>
+            <ul>
+                <li>Node.js (v14.0.0 o superior)</li>
+                <li>npm o yarn</li>
+                <!-- Añade otros requisitos según sea necesario -->
+            </ul>
+            
+            <h3>Pasos de Instalación</h3>
+            <ol>
+                <li>Clona el repositorio:
+                    <pre><code>git clone https://github.com/usuario/nombre-repositorio.git
+cd nombre-repositorio</code></pre>
+                </li>
+                <li>Instala las dependencias:
+                    <pre><code>npm install
+# o
+yarn install</code></pre>
+                </li>
+                <li>Configura las variables de entorno:
+                    <pre><code>cp .env.example .env
+# Edita el archivo .env con tus configuraciones</code></pre>
+                </li>
+                <li>Inicia el servidor de desarrollo:
+                    <pre><code>npm start
+# o
+yarn start</code></pre>
+                </li>
+            </ol>
+        </div>
+    </div>
+    
+    <div class="section">
+        <h2>📁 Estructura del Proyecto</h2>
+        <div class="file-structure">
+proyecto/
+├── public/
+│   ├── index.html
+│   └── assets/
+├── src/
+│   ├── components/
+│   ├── pages/
+│   ├── services/
+│   ├── utils/
+│   ├── App.js
+│   └── index.js
+├── .env.example
+├── package.json
+└── README.html
+        </div>
+    </div>
+    
+    <div class="section">
+        <h2>✨ Características Principales</h2>
+        
+        <div class="feature-card">
+            <h3 class="feature-title">Característica 1</h3>
+            <p>Descripción detallada de la primera característica principal del proyecto.</p>
+        </div>
+        
+        <div class="feature-card">
+            <h3 class="feature-title">Característica 2</h3>
+            <p>Descripción detallada de la segunda característica principal del proyecto.</p>
+        </div>
+        
+        <div class="feature-card">
+            <h3 class="feature-title">Característica 3</h3>
+            <p>Descripción detallada de la tercera característica principal del proyecto.</p>
+        </div>
+    </div>
+    
+    <div class="section">
+        <h2>🔧 Uso</h2>
+        <p>Explica cómo utilizar el proyecto una vez instalado. Incluye ejemplos de código si es necesario.</p>
+        
+        <h3>Ejemplo de Uso</h3>
+        <pre><code>// Ejemplo de código que muestra cómo usar una función o característica
+import { algunaFuncion } from './utils';
+
+algunaFuncion(parametros);</code></pre>
+    </div>
+    
+    <div class="section">
+        <h2>🤝 Contribución</h2>
+        <p>
+            Las contribuciones son bienvenidas. Para contribuir:
+        </p>
+        <ol>
+            <li>Haz un fork del proyecto</li>
+            <li>Crea una rama para tu característica (<code>git checkout -b feature/amazing-feature</code>)</li>
+            <li>Haz commit de tus cambios (<code>git commit -m 'Add some amazing feature'</code>)</li>
+            <li>Haz push a la rama (<code>git push origin feature/amazing-feature</code>)</li>
+            <li>Abre un Pull Request</li>
+        </ol>
+    </div>
+    
+    <div class="section">
+        <h2>📄 Licencia</h2>
+        <p>Este proyecto está licenciado bajo la Licencia XYZ - ver el archivo LICENSE para más detalles.</p>
+    </div>
+    
+    <div class="section">
+        <h2>📞 Contacto</h2>
+        <p>
+            Nombre - <a href="mailto:email@ejemplo.com">email@ejemplo.com</a><br>
+            Enlace del Proyecto: <a href="https://github.com/usuario/nombre-repositorio">https://github.com/usuario/nombre-repositorio</a>
+        </p>
+    </div>
+    
+    <footer>
+        <p>© 2023 Nombre del Proyecto. Todos los derechos reservados.</p>
+    </footer>
+</body>
+</html> 
