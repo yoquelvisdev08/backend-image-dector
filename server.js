@@ -407,6 +407,40 @@ app.get('/api/preview-image', async (req, res) => {
   }
 });
 
+// Endpoint para descargar una imagen individual
+app.get('/api/download', async (req, res) => {
+  const imageUrl = req.query.url;
+  if (!imageUrl) {
+    return res.status(400).json({ error: 'Se requiere una URL de imagen' });
+  }
+
+  try {
+    const response = await axios({
+      method: 'GET',
+      url: imageUrl,
+      responseType: 'stream',
+      timeout: 15000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+      }
+    });
+
+    // Obtener el nombre del archivo de la URL
+    const urlObj = new URL(imageUrl);
+    const filename = path.basename(urlObj.pathname).split('?')[0] || 'imagen.jpg';
+
+    // Configurar headers para la descarga
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Type', response.headers['content-type']);
+    
+    // Transmitir la imagen al cliente
+    response.data.pipe(res);
+  } catch (error) {
+    console.error('Error al descargar la imagen:', error);
+    res.status(500).json({ error: 'Error al descargar la imagen' });
+  }
+});
+
 // Manejo de rutas no encontradas
 app.use((req, res) => {
   res.status(404).json({ error: 'Ruta no encontrada' });
