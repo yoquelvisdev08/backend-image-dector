@@ -1,10 +1,12 @@
 Aquí hay varias estrategias para mejorar el endpoint /api/scan y crear una toolbar más útil:
+
 Categorización de Imágenes:
 Detectar si son logos
 Identificar banners
 Clasificar por tamaño (pequeñas, medianas, grandes)
 Detectar si son iconos
 Identificar imágenes de fondo
+
 Metadatos Mejorados:
 Extraer colores dominantes
 Detectar formato (JPG, PNG, SVG, etc.)
@@ -17,12 +19,14 @@ Identificar enlaces relacionados
 Detectar si está en un carrusel
 Obtener la sección de la página donde aparece
 Identificar si es parte de un menú
+
 Filtros Avanzados:
 Por ratio de aspecto
 Por orientación (vertical/horizontal)
 Por ubicación en la página
 Por tipo de contenedor
 Por calidad de imagen
+
 5. Agrupamiento Inteligente:
 Agrupar imágenes similares
 Identificar series de imágenes
@@ -33,13 +37,35 @@ Validar textos alternativos
 Verificar contraste
 Comprobar si tienen etiquetas ARIA
 Evaluar descripción larga
+
 Optimización:
 Sugerir formatos más eficientes
 Identificar imágenes que necesitan compresión
 Detectar imágenes mal dimensionadas
 Analizar uso de lazy loading
+
 Información SEO:
 Evaluar nombres de archivo
 Analizar estructura de URLs
 Verificar atributos title
 Comprobar metadatos de OpenGraph
+
+
+
+Detección de objetos o etiquetas en imágenes (AI Vision)
+Usa modelos de visión por computadora (como Google Cloud Vision, AWS Rekognition o modelos open-source) para identificar objetos, marcas, logotipos, rostros, etc.
+
+Clasificación y filtrado inteligente de imágenes
+Puedes categorizar automáticamente las imágenes escaneadas por contenido (ej. "producto", "persona", "documento", etc.).
+
+Extracción de metadatos EXIF y análisis de origen
+Extrae datos como ubicación GPS, dispositivo, fecha de captura. Muy útil para periodistas, investigaciones o verificación de imágenes.
+
+Sistema de puntuación de calidad de imagen
+Un score que indique si una imagen es nítida, está bien iluminada o tiene texto legible.
+
+Búsqueda inversa de imágenes
+Integrar servicios de búsqueda inversa (como TinEye o Google) para detectar duplicados o plagios.
+
+Resumen automático del texto OCR
+Usa un modelo NLP para hacer resúmenes automáticos del texto extraído. Útil en documentos extensos.

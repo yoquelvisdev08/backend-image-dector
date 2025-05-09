@@ -10,12 +10,10 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 const sizeOf = require('image-size');
 const path = require('path');
-const { createWorker } = require('tesseract.js');
-const ocrService = require('./src/services/ocr.service');
 
 // Configuración
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3001;
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 const RATE_LIMIT_WINDOW_MS = parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 60000;
 const RATE_LIMIT_MAX = parseInt(process.env.RATE_LIMIT_MAX) || 30;
@@ -116,16 +114,87 @@ const getImageDimensions = async (imageUrl) => {
   }
 };
 
+// Función mejorada para normalizar URLs
+const normalizeImageUrl = (src, baseUrl, targetUrl) => {
+  try {
+    // Remover espacios y caracteres especiales
+    src = src.trim().replace(/[\n\r\t]/g, '');
+    
+    // Si es data URL, ignorar
+    if (src.startsWith('data:')) return null;
+    
+    // Si es una URL absoluta
+    if (src.match(/^https?:\/\//i)) {
+      return src;
+    }
+    
+    // Manejar URLs relativas
+    if (src.startsWith('//')) {
+      // URLs protocol-relative
+      return `https:${src}`;
+    } else if (src.startsWith('/')) {
+      // URLs root-relative
+      return `${baseUrl}${src}`;
+    } else if (src.startsWith('../') || src.startsWith('./')) {
+      // URLs relativas con ../ o ./
+      return new URL(src, targetUrl).href;
+    } else {
+      // Otras URLs relativas
+      return new URL(src, targetUrl).href;
+    }
+  } catch (error) {
+    console.error(`Error normalizando URL: ${src}`, error);
+    return null;
+  }
+};
+
+// Headers mejorados para evitar bloqueos
+const commonHeaders = {
+  'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+  'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
+  'Accept-Encoding': 'gzip, deflate, br',
+  'Cache-Control': 'no-cache',
+  'Pragma': 'no-cache',
+  'Sec-Ch-Ua': '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
+  'Sec-Ch-Ua-Mobile': '?0',
+  'Sec-Ch-Ua-Platform': '"macOS"',
+  'Sec-Fetch-Dest': 'document',
+  'Sec-Fetch-Mode': 'navigate',
+  'Sec-Fetch-Site': 'none',
+  'Sec-Fetch-User': '?1',
+  'Upgrade-Insecure-Requests': '1',
+  'Connection': 'keep-alive',
+  'DNT': '1'
+};
+
+// Función para rotar User-Agents
+const userAgents = [
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3.1 Safari/605.1.15',
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0'
+];
+
+const getRandomUserAgent = () => {
+  return userAgents[Math.floor(Math.random() * userAgents.length)];
+};
+
+// Función para añadir delay aleatorio
+const randomDelay = (min = 1000, max = 3000) => {
+  return new Promise(resolve => setTimeout(resolve, Math.floor(Math.random() * (max - min + 1)) + min));
+};
+
 // Endpoint para verificar estado del servidor
 app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'ok', message: 'Servidor funcionando correctamente' });
 });
 
-// Ruta para escanear imágenes de una URL
+// Ruta mejorada para escanear imágenes
 app.post('/api/scan', [
   body('targetUrl').isURL().withMessage('URL inválida')
 ], async (req, res) => {
-  // Validar entrada
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({ errors: errors.array(), message: 'URL inválida' });
@@ -135,89 +204,167 @@ app.post('/api/scan', [
   console.log(`Solicitud de escaneo para URL: ${targetUrl}`);
 
   try {
-    // Obtener el contenido HTML de la URL
-    const response = await axios({
-      method: 'GET',
-      url: targetUrl,
-      timeout: 15000,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-      },
-      // Asegurarse de que no se use caché
-      cache: false
-    });
+    // Obtener el contenido HTML con retry y timeout
+    const maxRetries = 3;
+    let response;
+    let retryCount = 0;
+
+    while (retryCount < maxRetries) {
+      try {
+        // Añadir delay aleatorio entre intentos
+        if (retryCount > 0) {
+          await randomDelay(2000, 5000);
+        }
+
+        // Rotar User-Agent en cada intento
+        const headers = {
+          ...commonHeaders,
+          'User-Agent': getRandomUserAgent(),
+          'Referer': 'https://www.google.com/',
+          'Origin': new URL(targetUrl).origin
+        };
+
+        response = await axios({
+          method: 'GET',
+          url: targetUrl,
+          timeout: 20000,
+          headers: headers,
+          maxRedirects: 5,
+          validateStatus: status => status < 400,
+          decompress: true,
+          proxy: false,
+          httpsAgent: new (require('https').Agent)({
+            rejectUnauthorized: false,
+            keepAlive: true
+          })
+        });
+        break;
+      } catch (error) {
+        retryCount++;
+        console.error(`Intento ${retryCount} fallido:`, error.message);
+        
+        if (retryCount === maxRetries) {
+          throw new Error(`Error después de ${maxRetries} intentos: ${error.message}`);
+        }
+        
+        await randomDelay(3000, 7000);
+      }
+    }
 
     const html = response.data;
     const $ = cheerio.load(html);
     const baseUrl = new URL(targetUrl).origin;
-    
-    // Extraer todas las imágenes
-    const images = [];
+    const processedUrls = new Set(); // Para evitar duplicados
+    const images = []; // Array para almacenar las imágenes
     let imageIndex = 0;
 
-    $('img').each((i, element) => {
-      let src = $(element).attr('src');
-      if (!src) return;
+    // Buscar imágenes en diferentes atributos y elementos
+    $('img, [style*="background-image"], picture source, [data-src], [data-srcset]').each((i, element) => {
+      let sources = [];
+      
+      // Buscar en src
+      const src = $(element).attr('src');
+      if (src) sources.push(src);
+      
+      // Buscar en srcset
+      const srcset = $(element).attr('srcset');
+      if (srcset) {
+        const srcsetUrls = srcset.split(',')
+          .map(s => s.trim().split(' ')[0])
+          .filter(Boolean);
+        sources.push(...srcsetUrls);
+      }
+      
+      // Buscar en data-src y data-srcset
+      const dataSrc = $(element).attr('data-src');
+      if (dataSrc) sources.push(dataSrc);
+      
+      const dataSrcset = $(element).attr('data-srcset');
+      if (dataSrcset) {
+        const dataSrcsetUrls = dataSrcset.split(',')
+          .map(s => s.trim().split(' ')[0])
+          .filter(Boolean);
+        sources.push(...dataSrcsetUrls);
+      }
+      
+      // Buscar en style background-image
+      const style = $(element).attr('style');
+      if (style) {
+        const bgMatch = style.match(/background-image:\s*url\(['"]?([^'"()]+)['"]?\)/i);
+        if (bgMatch) sources.push(bgMatch[1]);
+      }
 
-      // Convertir URLs relativas a absolutas
-      if (src.startsWith('/')) {
-        src = baseUrl + src;
-      } else if (!src.startsWith('http')) {
-        try {
-          src = new URL(src, targetUrl).href;
-        } catch (e) {
-          console.error(`Error al procesar URL de imagen: ${src}`, e);
-          return;
+      // Buscar en picture source
+      if (element.tagName === 'source') {
+        const srcset = $(element).attr('srcset');
+        if (srcset) {
+          const sourceUrls = srcset.split(',')
+            .map(s => s.trim().split(' ')[0])
+            .filter(Boolean);
+          sources.push(...sourceUrls);
         }
       }
 
-      // Ignorar imágenes data:image
-      if (src.startsWith('data:')) return;
+      // Procesar cada fuente encontrada
+      sources.forEach(src => {
+        const normalizedSrc = normalizeImageUrl(src, baseUrl, targetUrl);
+        if (!normalizedSrc) return;
+        
+        // Normalizar la URL para comparación
+        const normalizedUrl = normalizedSrc.toLowerCase().split('?')[0];
+        if (processedUrls.has(normalizedUrl)) return;
+        
+        processedUrls.add(normalizedUrl);
+        const alt = $(element).attr('alt') || 'Imagen sin descripción';
+        const width = parseInt($(element).attr('width') || '0', 10) || 0;
+        const height = parseInt($(element).attr('height') || '0', 10) || 0;
 
-      // Obtener atributos
-      const alt = $(element).attr('alt') || 'Imagen sin descripción';
-      const width = parseInt($(element).attr('width') || '0', 10) || 0;
-      const height = parseInt($(element).attr('height') || '0', 10) || 0;
+        // Calcular posición vertical aproximada
+        let top = i * 150;
+        try {
+          const parent = $(element).parent();
+          if (parent.length > 0) {
+            const siblings = parent.children();
+            const index = siblings.index(element);
+            if (index !== -1) {
+              top = index * 150;
+            }
+          }
+        } catch (error) {
+          console.log('Error calculando posición:', error);
+        }
 
-      // Añadir la imagen a la lista
-      images.push({
-        id: `img-${imageIndex++}`,
-        src,
-        alt,
-        width: width || 200, // Valor por defecto si no se puede determinar
-        height: height || 150, // Valor por defecto si no se puede determinar
-        top: i * 10, // Posición aproximada
-        selected: false
+        images.push({
+          id: `img-${imageIndex++}`,
+          src: normalizedSrc,
+          alt,
+          width: width || 200,
+          height: height || 150,
+          top,
+          selected: false
+        });
       });
     });
 
+    // Ordenar las imágenes por posición
+    images.sort((a, b) => a.top - b.top);
+
     console.log(`Imágenes encontradas en ${targetUrl}: ${images.length}`);
 
-    // Corregir las URLs de las imágenes antes de devolverlas
-    const correctedImages = images.map(img => {
-      // Corregir URLs con doble dominio
-      if (img.src.includes('//' + targetUrl.host)) {
-        img.src = img.src.replace('//' + targetUrl.host, '');
-      }
-      
-      // Asegurarse de que las URLs relativas sean absolutas
-      if (img.src.startsWith('/')) {
-        img.src = targetUrl.origin + img.src;
-      }
-      
-      return img;
-    });
-    
-    // Devolver las imágenes corregidas
     return res.json({ 
-      images: correctedImages,
-      url: targetUrl.toString() 
+      images,
+      url: targetUrl 
     });
   } catch (error) {
     console.error(`Error al escanear ${targetUrl}:`, error.message);
     res.status(500).json({ 
       message: `Error al escanear la URL: ${error.message}`,
-      error: error.message
+      error: error.message,
+      details: {
+        code: error.code,
+        response: error.response?.status,
+        headers: error.response?.headers
+      }
     });
   }
 });
@@ -440,39 +587,6 @@ app.get('/api/download', async (req, res) => {
   } catch (error) {
     console.error('Error al descargar la imagen:', error);
     res.status(500).json({ error: 'Error al descargar la imagen' });
-  }
-});
-
-// Endpoint para OCR de imágenes
-app.post('/api/ocr', async (req, res) => {
-  try {
-    const { imageUrl, language } = req.body;
-    if (!imageUrl) {
-      return res.status(400).json({ error: 'Se requiere una URL de imagen' });
-    }
-    console.log(`Procesando OCR para imagen: ${imageUrl}`);
-    // Usar el servicio OCR.space
-    const ocrResult = await ocrService.recognizeText(imageUrl, language || 'spa');
-    res.json({
-      success: true,
-      text: ocrResult.text,
-      lines: ocrResult.text.split('\n').map(line => line.trim()).filter(Boolean),
-      rawText: ocrResult.text,
-      language: language || 'spa',
-      confidence: ocrResult.confidence,
-      stats: {
-        lineCount: ocrResult.text.split('\n').length,
-        characterCount: ocrResult.text.length,
-        wordCount: ocrResult.text.split(/\s+/).length
-      }
-    });
-  } catch (error) {
-    console.error('Error en OCR:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Error al procesar la imagen',
-      details: error.message
-    });
   }
 });
 
