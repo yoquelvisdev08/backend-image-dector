@@ -58,9 +58,53 @@ Verifica el estado del servidor.
 
 ### POST /api/scan
 Escanea imágenes de una URL.
+
+**Request:**
 ```json
 {
   "targetUrl": "https://ejemplo.com"
+}
+```
+
+**Response exitosa:**
+```json
+{
+  "images": [
+    {
+      "id": "img-0",
+      "src": "https://ejemplo.com/imagen1.jpg",
+      "alt": "Descripción de la imagen",
+      "width": 800,
+      "height": 600,
+      "top": 0,
+      "selected": false
+    },
+    // ... más imágenes
+  ],
+  "url": "https://ejemplo.com"
+}
+```
+
+**Campos de la respuesta:**
+- `images`: Array de imágenes encontradas
+  - `id`: Identificador único de la imagen
+  - `src`: URL de la imagen
+  - `alt`: Texto alternativo de la imagen
+  - `width`: Ancho de la imagen (en píxeles)
+  - `height`: Alto de la imagen (en píxeles)
+  - `top`: Posición vertical aproximada en la página
+  - `selected`: Estado de selección (para UI)
+- `url`: URL escaneada
+
+**Errores posibles:**
+```json
+{
+  "errors": [
+    {
+      "msg": "URL inválida"
+    }
+  ],
+  "message": "URL inválida"
 }
 ```
 
@@ -91,6 +135,57 @@ Proxy para imágenes (evita problemas CORS).
 Obtiene una versión optimizada de la imagen.
 ```
 /api/preview-image?url=https://ejemplo.com/imagen.jpg
+```
+
+### POST /api/ocr
+Extrae texto de una imagen usando OCR (Reconocimiento Óptico de Caracteres).
+
+**Request:**
+```json
+{
+  "imageUrl": "https://ejemplo.com/imagen-con-texto.jpg"
+}
+```
+
+**Response exitosa:**
+```json
+{
+  "success": true,
+  "text": "Texto limpio y formateado",
+  "lines": [
+    "Primera línea",
+    "Segunda línea",
+    "..."
+  ],
+  "rawText": "Texto original sin procesar",
+  "language": "eng+spa",
+  "confidence": 95,
+  "stats": {
+    "lineCount": 3,
+    "characterCount": 40,
+    "wordCount": 5
+  }
+}
+```
+
+**Campos de la respuesta:**
+- `text`: Texto extraído y limpio
+- `lines`: Array de líneas individuales
+- `rawText`: Texto original sin procesar
+- `language`: Idiomas soportados (español e inglés)
+- `confidence`: Nivel de confianza del OCR (0-100)
+- `stats`: Estadísticas del texto extraído
+  - `lineCount`: Número de líneas
+  - `characterCount`: Número de caracteres
+  - `wordCount`: Número de palabras
+
+**Errores posibles:**
+```json
+{
+  "success": false,
+  "error": "Error al procesar la imagen",
+  "details": "Mensaje de error específico"
+}
 ```
 
 ## Seguridad

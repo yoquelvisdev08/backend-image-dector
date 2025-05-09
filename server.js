@@ -10,6 +10,7 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 const sizeOf = require('image-size');
 const path = require('path');
+const { createWorker } = require('tesseract.js');
 
 // Configuración
 const app = express();
@@ -438,6 +439,75 @@ app.get('/api/download', async (req, res) => {
   } catch (error) {
     console.error('Error al descargar la imagen:', error);
     res.status(500).json({ error: 'Error al descargar la imagen' });
+  }
+});
+
+// Endpoint para OCR de imágenes
+app.post('/api/ocr', async (req, res) => {
+  let worker = null;
+  try {
+    const { imageUrl } = req.body;
+
+    if (!imageUrl) {
+      return res.status(400).json({ error: 'Se requiere una URL de imagen' });
+    }
+
+    console.log(`Procesando OCR para imagen: ${imageUrl}`);
+
+    // Descargar la imagen
+    const imageResponse = await axios({
+      method: 'GET',
+      url: imageUrl,
+      responseType: 'arraybuffer',
+      timeout: 15000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+      }
+    });
+
+    // Crear worker con la nueva API
+    worker = await createWorker('eng+spa');
+
+    // Procesar la imagen
+    const { data } = await worker.recognize(Buffer.from(imageResponse.data));
+
+    // Limpiar y procesar el texto
+    const rawText = data.text.trim();
+    const cleanText = rawText
+      .replace(/\s+>/g, '>') // Eliminar espacios antes de >
+      .replace(/\s+\n/g, '\n') // Eliminar espacios al final de cada línea
+      .replace(/\n+/g, '\n') // Eliminar líneas vacías múltiples
+      .trim();
+
+    // Separar el texto en líneas
+    const lines = cleanText.split('\n').map(line => line.trim()).filter(Boolean);
+
+    // Devolver el texto extraído con formato mejorado
+    res.json({
+      success: true,
+      text: cleanText,
+      lines: lines,
+      rawText: rawText,
+      language: 'eng+spa',
+      confidence: data.confidence,
+      stats: {
+        lineCount: lines.length,
+        characterCount: cleanText.length,
+        wordCount: cleanText.split(/\s+/).length
+      }
+    });
+
+  } catch (error) {
+    console.error('Error en OCR:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error al procesar la imagen',
+      details: error.message
+    });
+  } finally {
+    if (worker) {
+      await worker.terminate();
+    }
   }
 });
 
