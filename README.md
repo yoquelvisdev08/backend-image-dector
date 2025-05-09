@@ -11,6 +11,7 @@ API REST para escanear y procesar imágenes de sitios web.
 - Sistema de caché para mejorar el rendimiento
 - Rate limiting para proteger la API
 - Manejo de errores robusto
+- **OCR avanzado usando ocr.space con compresión automática de imágenes**
 
 ## Requisitos
 
@@ -140,10 +141,13 @@ Obtiene una versión optimizada de la imagen.
 ### POST /api/ocr
 Extrae texto de una imagen usando OCR (Reconocimiento Óptico de Caracteres).
 
+**Ahora utiliza la API de [ocr.space](https://ocr.space/OCRAPI) y comprime automáticamente las imágenes a menos de 1MB en memoria antes de enviarlas. No se almacenan archivos temporales en el backend.**
+
 **Request:**
 ```json
 {
-  "imageUrl": "https://ejemplo.com/imagen-con-texto.jpg"
+  "imageUrl": "https://ejemplo.com/imagen-con-texto.jpg",
+  "language": "spa" // Opcional, por defecto 'spa' (español)
 }
 ```
 
@@ -158,8 +162,8 @@ Extrae texto de una imagen usando OCR (Reconocimiento Óptico de Caracteres).
     "..."
   ],
   "rawText": "Texto original sin procesar",
-  "language": "eng+spa",
-  "confidence": 95,
+  "language": "spa",
+  "confidence": 100,
   "stats": {
     "lineCount": 3,
     "characterCount": 40,
@@ -168,16 +172,10 @@ Extrae texto de una imagen usando OCR (Reconocimiento Óptico de Caracteres).
 }
 ```
 
-**Campos de la respuesta:**
-- `text`: Texto extraído y limpio
-- `lines`: Array de líneas individuales
-- `rawText`: Texto original sin procesar
-- `language`: Idiomas soportados (español e inglés)
-- `confidence`: Nivel de confianza del OCR (0-100)
-- `stats`: Estadísticas del texto extraído
-  - `lineCount`: Número de líneas
-  - `characterCount`: Número de caracteres
-  - `wordCount`: Número de palabras
+**Notas importantes:**
+- Si la imagen es mayor a 1MB, el backend la redimensiona y comprime automáticamente antes de enviarla a ocr.space.
+- Todo el procesamiento se realiza en memoria, sin archivos temporales.
+- El OCR soporta múltiples idiomas (ver documentación de ocr.space para más opciones).
 
 **Errores posibles:**
 ```json
