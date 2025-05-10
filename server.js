@@ -24,7 +24,7 @@ app.use(helmet());
 
 // Configuración CORS
 app.use(cors({
-  origin: FRONTEND_URL,
+  origin: '*' ,
   methods: ['GET', 'POST'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
