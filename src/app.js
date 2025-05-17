@@ -14,6 +14,7 @@ const cleanupService = require('./services/cleanup.service');
 const config = require('./config/app.config');
 const securityMiddleware = require('./middleware/security');
 const cleanTemp = require('./scripts/clean-temp');
+const ocrRoutes = require('./routes/ocr.routes');
 
 // Crear directorio de logs si no existe
 const logDir = path.join(__dirname, '../logs');
@@ -63,6 +64,7 @@ if (process.env.NODE_ENV === 'development') {
 // Rutas de la API
 const apiPrefix = process.env.API_PREFIX || '/api';
 app.use(apiPrefix, apiRoutes);
+app.use(apiPrefix, ocrRoutes);
 
 // Ruta de health check
 app.get('/health', (req, res) => {

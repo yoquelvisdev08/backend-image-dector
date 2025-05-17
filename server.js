@@ -10,6 +10,8 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 const sizeOf = require('image-size');
 const path = require('path');
+const ocrRoutes = require('./src/routes/ocr.routes');
+const thanosService = require('./src/services/thanos.service');
 
 // Configuración
 const app = express();
@@ -186,10 +188,142 @@ const randomDelay = (min = 1000, max = 3000) => {
   return new Promise(resolve => setTimeout(resolve, Math.floor(Math.random() * (max - min + 1)) + min));
 };
 
+console.log('Montando rutas OCR en /api');
+app.use('/api', (req, res, next) => {
+  console.log('Petición recibida en /api:', req.method, req.originalUrl);
+  next();
+});
+app.use('/api', ocrRoutes);
+
 // Endpoint para verificar estado del servidor
 app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'ok', message: 'Servidor funcionando correctamente' });
 });
+
+// Función para extraer imágenes de iframes
+const extractImagesFromIframes = async ($, baseUrl) => {
+  const iframeImages = [];
+  const iframes = $('iframe');
+  
+  for (const iframe of iframes) {
+    try {
+      const iframeSrc = $(iframe).attr('src');
+      if (iframeSrc) {
+        const iframeUrl = new URL(iframeSrc, baseUrl).href;
+        const iframeResponse = await axios.get(iframeUrl, { 
+          headers: commonHeaders,
+          timeout: 10000
+        });
+        const iframe$ = cheerio.load(iframeResponse.data);
+        const images = iframe$('img').map((_, img) => {
+          const src = iframe$(img).attr('src');
+          return normalizeImageUrl(src, baseUrl, iframeUrl);
+        }).get();
+        iframeImages.push(...images);
+      }
+    } catch (error) {
+      console.error('Error procesando iframe:', error);
+    }
+  }
+  return iframeImages;
+};
+
+// Función para extraer imágenes con lazy loading
+const extractLazyLoadedImages = ($) => {
+  const lazyImages = [];
+  
+  // Buscar atributos comunes de lazy loading
+  const lazySelectors = [
+    'img[data-src]',
+    'img[data-lazy-src]',
+    'img[data-original]',
+    'img[data-url]',
+    'img[data-srcset]',
+    'img[loading="lazy"]',
+    'img.lazy',
+    'img.lazyload',
+    'img[data-lazy]',
+    'img[data-delayed-url]'
+  ];
+  
+  lazySelectors.forEach(selector => {
+    $(selector).each((_, img) => {
+      const src = $(img).attr('data-src') || 
+                 $(img).attr('data-lazy-src') || 
+                 $(img).attr('data-original') || 
+                 $(img).attr('data-url') ||
+                 $(img).attr('data-lazy') ||
+                 $(img).attr('data-delayed-url');
+      if (src) lazyImages.push(src);
+    });
+  });
+  
+  return lazyImages;
+};
+
+// Función para extraer imágenes de background en CSS
+const extractBackgroundImages = ($) => {
+  const bgImages = [];
+  
+  $('*').each((_, element) => {
+    const style = $(element).attr('style');
+    if (style) {
+      const matches = style.match(/url\(['"]?([^'"()]+)['"]?\)/g);
+      if (matches) {
+        matches.forEach(match => {
+          const url = match.match(/url\(['"]?([^'"()]+)['"]?\)/)[1];
+          bgImages.push(url);
+        });
+      }
+    }
+  });
+  
+  return bgImages;
+};
+
+// Función para manejar sitios que bloquean scraping
+const getEnhancedHeaders = (targetUrl) => {
+  const origin = new URL(targetUrl).origin;
+  const host = new URL(targetUrl).host;
+  
+  // Headers específicos para sitios que bloquean scraping
+  const enhancedHeaders = {
+    ...commonHeaders,
+    'User-Agent': getRandomUserAgent(),
+    'Referer': 'https://www.google.com/',
+    'Origin': origin,
+    'Host': host,
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+    'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
+    'Accept-Encoding': 'gzip, deflate, br',
+    'Connection': 'keep-alive',
+    'Upgrade-Insecure-Requests': '1',
+    'Sec-Fetch-Dest': 'document',
+    'Sec-Fetch-Mode': 'navigate',
+    'Sec-Fetch-Site': 'none',
+    'Sec-Fetch-User': '?1',
+    'Cache-Control': 'no-cache',
+    'Pragma': 'no-cache',
+    'DNT': '1',
+    'sec-ch-ua': '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
+    'sec-ch-ua-mobile': '?0',
+    'sec-ch-ua-platform': '"macOS"'
+  };
+
+  // Headers específicos para Pexels
+  if (host.includes('pexels.com')) {
+    return {
+      ...enhancedHeaders,
+      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.9',
+      'Referer': 'https://www.google.com/search?q=pexels+photos',
+      'Cookie': 'pexels_session=1; _pexels_session=1'
+    };
+  }
+
+  return enhancedHeaders;
+};
 
 // Ruta mejorada para escanear imágenes
 app.post('/api/scan', [
@@ -216,13 +350,8 @@ app.post('/api/scan', [
           await randomDelay(2000, 5000);
         }
 
-        // Rotar User-Agent en cada intento
-        const headers = {
-          ...commonHeaders,
-          'User-Agent': getRandomUserAgent(),
-          'Referer': 'https://www.google.com/',
-          'Origin': new URL(targetUrl).origin
-        };
+        const headers = getEnhancedHeaders(targetUrl);
+        console.log('Usando headers:', headers);
 
         response = await axios({
           method: 'GET',
@@ -242,129 +371,64 @@ app.post('/api/scan', [
       } catch (error) {
         retryCount++;
         console.error(`Intento ${retryCount} fallido:`, error.message);
-        
         if (retryCount === maxRetries) {
           throw new Error(`Error después de ${maxRetries} intentos: ${error.message}`);
         }
-        
         await randomDelay(3000, 7000);
       }
     }
 
-    const html = response.data;
-    const $ = cheerio.load(html);
-    const baseUrl = new URL(targetUrl).origin;
-    const processedUrls = new Set(); // Para evitar duplicados
-    const images = []; // Array para almacenar las imágenes
-    let imageIndex = 0;
-
-    // Buscar imágenes en diferentes atributos y elementos
-    $('img, [style*="background-image"], picture source, [data-src], [data-srcset]').each((i, element) => {
-      let sources = [];
-      
-      // Buscar en src
-      const src = $(element).attr('src');
-      if (src) sources.push(src);
-      
-      // Buscar en srcset
-      const srcset = $(element).attr('srcset');
-      if (srcset) {
-        const srcsetUrls = srcset.split(',')
-          .map(s => s.trim().split(' ')[0])
-          .filter(Boolean);
-        sources.push(...srcsetUrls);
-      }
-      
-      // Buscar en data-src y data-srcset
-      const dataSrc = $(element).attr('data-src');
-      if (dataSrc) sources.push(dataSrc);
-      
-      const dataSrcset = $(element).attr('data-srcset');
-      if (dataSrcset) {
-        const dataSrcsetUrls = dataSrcset.split(',')
-          .map(s => s.trim().split(' ')[0])
-          .filter(Boolean);
-        sources.push(...dataSrcsetUrls);
-      }
-      
-      // Buscar en style background-image
-      const style = $(element).attr('style');
-      if (style) {
-        const bgMatch = style.match(/background-image:\s*url\(['"]?([^'"()]+)['"]?\)/i);
-        if (bgMatch) sources.push(bgMatch[1]);
-      }
-
-      // Buscar en picture source
-      if (element.tagName === 'source') {
-        const srcset = $(element).attr('srcset');
-        if (srcset) {
-          const sourceUrls = srcset.split(',')
-            .map(s => s.trim().split(' ')[0])
-            .filter(Boolean);
-          sources.push(...sourceUrls);
-        }
-      }
-
-      // Procesar cada fuente encontrada
-      sources.forEach(src => {
-        const normalizedSrc = normalizeImageUrl(src, baseUrl, targetUrl);
-        if (!normalizedSrc) return;
-        
-        // Normalizar la URL para comparación
-        const normalizedUrl = normalizedSrc.toLowerCase().split('?')[0];
-        if (processedUrls.has(normalizedUrl)) return;
-        
-        processedUrls.add(normalizedUrl);
-        const alt = $(element).attr('alt') || 'Imagen sin descripción';
-        const width = parseInt($(element).attr('width') || '0', 10) || 0;
-        const height = parseInt($(element).attr('height') || '0', 10) || 0;
-
-        // Calcular posición vertical aproximada
-        let top = i * 150;
+    const $ = cheerio.load(response.data);
+    
+    // Extraer imágenes de diferentes fuentes
+    const regularImages = $('img').map((_, img) => $(img).attr('src')).get();
+    const iframeImages = await extractImagesFromIframes($, targetUrl);
+    const lazyImages = extractLazyLoadedImages($);
+    const bgImages = extractBackgroundImages($);
+    
+    // Combinar y normalizar todas las URLs
+    const allImages = [...regularImages, ...iframeImages, ...lazyImages, ...bgImages]
+      .map(src => normalizeImageUrl(src, targetUrl))
+      .filter(Boolean);
+    
+    // Eliminar duplicados
+    const uniqueImages = [...new Set(allImages)];
+    
+    // Obtener dimensiones y filtrar imágenes muy pequeñas
+    const processedImages = await Promise.all(
+      uniqueImages.map(async (src) => {
         try {
-          const parent = $(element).parent();
-          if (parent.length > 0) {
-            const siblings = parent.children();
-            const index = siblings.index(element);
-            if (index !== -1) {
-              top = index * 150;
-            }
-          }
+          const dimensions = await getImageDimensions(src);
+          return {
+            src,
+            ...dimensions,
+            id: Math.random().toString(36).substr(2, 9)
+          };
         } catch (error) {
-          console.log('Error calculando posición:', error);
+          console.error(`Error procesando imagen ${src}:`, error);
+          return null;
         }
-
-        images.push({
-          id: `img-${imageIndex++}`,
-          src: normalizedSrc,
-          alt,
-          width: width || 200,
-          height: height || 150,
-          top,
-          selected: false
-        });
-      });
-    });
-
-    // Ordenar las imágenes por posición
-    images.sort((a, b) => a.top - b.top);
-
-    console.log(`Imágenes encontradas en ${targetUrl}: ${images.length}`);
-
-    return res.json({ 
-      images,
-      url: targetUrl 
+      })
+    );
+    
+    // Filtrar imágenes inválidas y muy pequeñas
+    const validImages = processedImages
+      .filter(Boolean)
+      .filter(img => img.width >= 100 && img.height >= 100);
+    
+    res.json({ 
+      images: validImages,
+      stats: {
+        totalFound: allImages.length,
+        uniqueFound: uniqueImages.length,
+        validImages: validImages.length
+      }
     });
   } catch (error) {
-    console.error(`Error al escanear ${targetUrl}:`, error.message);
-    res.status(500).json({ 
-      message: `Error al escanear la URL: ${error.message}`,
-      error: error.message,
-      details: {
-        code: error.code,
-        response: error.response?.status,
-        headers: error.response?.headers
-      }
+    console.error('Error en el escaneo:', error);
+    res.status(500).json({
+      error: 'Error al procesar la página',
+      message: error.message
     });
   }
 });
@@ -587,6 +651,38 @@ app.get('/api/download', async (req, res) => {
   } catch (error) {
     console.error('Error al descargar la imagen:', error);
     res.status(500).json({ error: 'Error al descargar la imagen' });
+  }
+});
+
+// Endpoint premium para extracción de imágenes (Thanos)
+app.post('/api/thanos', [
+  body('targetUrl').isURL().withMessage('URL inválida')
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array(), message: 'URL inválida' });
+  }
+
+  const { targetUrl } = req.body;
+  console.log(`Solicitud premium (Thanos) para URL: ${targetUrl}`);
+
+  try {
+    const result = await thanosService.snap(targetUrl);
+    res.json(result);
+  } catch (error) {
+    console.error('Error en Thanos:', error);
+    res.status(500).json({
+      error: 'Error al procesar la página',
+      message: error.message,
+      stats: {
+        method: 'failed',
+        timeElapsed: 0,
+        totalImages: 0,
+        uniqueImages: 0,
+        validImages: 0,
+        errors: [error.message]
+      }
+    });
   }
 });
 
